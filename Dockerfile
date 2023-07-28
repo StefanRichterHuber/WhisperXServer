@@ -35,11 +35,24 @@ COPY . /build
 # Build
 RUN mvn -Pnative native:compile
 
-# The deployment Image
-FROM docker.io/oraclelinux:8-slim
+# Build whisperX and copy the server binary
+FROM ubuntu:latest
 
+RUN apt update && \
+  apt install -y git pip python3 ffmpeg && \
+  rm -rf /var/lib/apt/lists/* 
+
+RUN git clone https://github.com/m-bain/whisperX.git && \
+  cd whisperX && \
+  pip install -e .
+
+# Cache for downloaded models
+RUN mkdir -p /root/.cache
+VOLUME /root/.cache
+
+# Server port
 EXPOSE 8080
 
 # Copy the native executable into the containers
-COPY --from=builder /build/target/whisperX-server .
-ENTRYPOINT ["/whisperX-server"]
+COPY --from=builder /build/target/whisperX-server-1.0.0-SNAPSHOT-runner .
+ENTRYPOINT ["/whisperX-server-1.0.0-SNAPSHOT-runner"]
