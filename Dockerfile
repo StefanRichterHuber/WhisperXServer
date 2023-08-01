@@ -33,10 +33,10 @@ WORKDIR /build
 COPY . /build
 
 # Build
-RUN mvn -Pnative native:compile
+RUN mvn clean install -Dnative
 
 # Build whisperX and copy the server binary
-FROM ubuntu:latest
+FROM ubuntu:latest AS final
 
 RUN apt update && \
   apt install -y git pip python3 ffmpeg && \

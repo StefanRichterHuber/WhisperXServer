@@ -13,14 +13,14 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import jakarta.annotation.PostConstruct;
@@ -30,136 +30,187 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class WhisperXService {
 
-    @Inject
-    Logger logger;
+	@Inject
+	Logger logger;
 
-    private String workdir = "/tmp";
-    private String executable = "whisperx";
-    private String computeType = "int8";
-    /**
-     * Number of parallel whisperX instances to run
-     */
-    private int numOfInstances = 1;
+	private String workdir = "/tmp";
+	private String computeType = "int8";
 
-    private static final String TASK_TRANSCRIBE = "transcribe";
-    private static final String TASK_TRANSLATE = "translate";
+	private static final String TASK_TRANSCRIBE = "transcribe";
+	private static final String TASK_TRANSLATE = "translate";
 
-    private Executor executor;
+	private Executor executor;
 
-    @PostConstruct
-    private void createExecutor() {
-        /**
-         * Since whisperX uses a lot of compute power and memory, we limit the amount of
-         * threads used (== 1 thread per parallel execution)
-         */
-        this.executor = new ThreadPoolExecutor(1, numOfInstances, 60, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<Runnable>());
-    }
+	/**
+	 * WhisperX executable to use
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.executable", defaultValue = "whisperx")
+	private String executable;
 
-    /**
-     * Transcribes the given audio content
-     * 
-     * @param content      Audio file in wav format, with 16.000 kHz and mono
-     * @param language     language spoken in the audio, specify null to perform
-     *                     language detection
-     * @param outputFormat One of srt,vtt,txt,tsv,json,aud
-     * @return String containing the result file
-     */
+	/**
+	 * Number of parallel whisperX instances to run. Further jobs get queued.
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.parallel-instances", defaultValue = "1")
+	private int numOfInstances;
 
-    public CompletableFuture<String> transcribe(byte[] content, String language, String outputFormat) {
-        return invokeWisperX(content, language, outputFormat, TASK_TRANSCRIBE);
-    }
+	/**
+	 * WhisperX model to use. (small, medium, large-v2)
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.model", defaultValue = "small")
+	String whisperXModel;
 
-    /**
-     * Translates the given audio content
-     * 
-     * @param content      Audio file in wav format, with 16.000 kHz and mono
-     * @param language     language spoken in the audio, specify null to perform
-     *                     language detection
-     * @param outputFormat One of srt,vtt,txt,tsv,json,aud
-     * @return String containing the result file
-     */
+	/**
+	 * Hugging Face Access Token to access PyAnnote gated models (default: None)
+	 * 
+	 * @see https://github.com/m-bain/whisperX
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.hf-token")
+	Optional<String> hfToken;
 
-    public CompletableFuture<String> translate(byte[] content, String language, String outputFormat) {
-        return invokeWisperX(content, language, outputFormat, TASK_TRANSLATE);
-    }
+	/**
+	 * number of threads used by torch for CPU inference; supercedes
+	 * MKL_NUM_THREADS/OMP_NUM_THREADS (default: 0)
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.threads")
+	Optional<Integer> whisperXThreads;
 
-    /**
-     * Invokes whisperX
-     * 
-     * @param content      Audio file in wav format, with 16.000 kHz and mono
-     * @param language     language spoken in the audio, specify null to perform
-     *                     language detection
-     * @param outputFormat One of srt,vtt,txt,tsv,json,aud
-     * @param task         One of transcribe,translate
-     * @return String containing the result file
-     */
+	/**
+	 * Apply diarization to assign speaker labels to each segment/word (default:
+	 * False)
+	 */
+	@Inject
+	@ConfigProperty(name = "whisperx.diarize", defaultValue = "false")
+	boolean diarize;
 
-    private CompletableFuture<String> invokeWisperX(byte[] content, String language, String outputFormat, String task) {
+	@PostConstruct
+	private void createExecutor() {
+		/**
+		 * Since whisperX uses a lot of compute power and memory, we limit the amount of
+		 * parallel executions.
+		 */
+		this.executor = Executors.newFixedThreadPool(numOfInstances);
+	}
 
-        final String filePrefix = UUID.randomUUID().toString();
-        final String sourceFile = workdir + "/" + filePrefix + ".wav";
-        final String resultFile = workdir + "/" + filePrefix + "." + outputFormat;
+	/**
+	 * Transcribes the given audio content
+	 * 
+	 * @param content      Audio file in wav format, with 16.000 kHz and mono
+	 * @param language     language spoken in the audio, specify null to perform
+	 *                     language detection
+	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @return String containing the result file
+	 */
 
-        return CompletableFuture.supplyAsync(() -> {
-            logger.infof(
-                    "Invoked whisperX service with task %s in language %s for input %s and output %s in the format %s",
-                    task, language, sourceFile, resultFile, outputFormat);
-            // Write temporary file
-            try (OutputStream os = new BufferedOutputStream(new FileOutputStream(sourceFile))) {
-                os.write(content);
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to write source file " + sourceFile, e);
-            }
+	public CompletableFuture<String> transcribe(byte[] content, String language, String outputFormat) {
+		return invokeWisperX(content, language, outputFormat, TASK_TRANSCRIBE);
+	}
 
-            // Invoke whisperX
-            try {
-                // Prepare default parameters
-                final List<String> parameters = new ArrayList<>();
-                parameters.addAll(Arrays.asList(executable, sourceFile, //
-                        "--compute_type", computeType, //
-                        "--output_dir", workdir, //
-                        "--task", task, //
-                        "--output_format", outputFormat));
-                // Add optional parameters
-                if (language != null && !language.isBlank()) {
-                    parameters.add("--language");
-                    parameters.add(language);
-                }
+	/**
+	 * Translates the given audio content to English
+	 * 
+	 * @param content      Audio file in wav format, with 16.000 kHz and mono
+	 * @param language     language spoken in the audio, specify null to perform
+	 *                     language detection
+	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @return String containing the result file
+	 */
 
-                logger.infof("Invoking %s", parameters.stream().collect(Collectors.joining(" "));
+	public CompletableFuture<String> translate(byte[] content, String language, String outputFormat) {
+		return invokeWisperX(content, language, outputFormat, TASK_TRANSLATE);
+	}
 
-                final Process process = new ProcessBuilder(parameters.toArray(new String[parameters.size()])).start();
+	/**
+	 * Invokes whisperX
+	 * 
+	 * @param content      Audio file in wav format, with 16.000 kHz and mono
+	 * @param language     language spoken in the audio, specify null to perform
+	 *                     language detection
+	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @param task         One of transcribe,translate
+	 * @return String containing the result file
+	 */
 
-                final int exitCode = process.waitFor();
-                logger.infof("WhisperX final status %d", exitCode);
+	private CompletableFuture<String> invokeWisperX(byte[] content, String language, String outputFormat, String task) {
 
-                if (exitCode == 0) {
-                    if (Files.exists(Paths.get(resultFile))) {
-                        // Read result file
-                        try (InputStream is = new BufferedInputStream(new FileInputStream(resultFile))) {
-                            var rawContent = is.readAllBytes();
-                            String result = new String(rawContent, StandardCharsets.UTF_8);
-                            return result;
-                        }
-                    } else {
-                        throw new IOException("Result file " + resultFile + " not found");
-                    }
-                } else {
-                    throw new IOException("Failed to invoke " + executable + " with code " + exitCode);
-                }
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException("Failed to invoke " + executable, e);
-            } finally {
-                // Clean up both temporary files
-                try {
-                    Files.deleteIfExists(Paths.get(sourceFile));
-                    Files.deleteIfExists(Paths.get(resultFile));
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to clean up files", e);
-                }
-            }
-        }, executor);
-    }
+		final String filePrefix = UUID.randomUUID().toString();
+		final String sourceFile = workdir + "/" + filePrefix + ".wav";
+		final String resultFile = workdir + "/" + filePrefix + "." + outputFormat;
+
+		return CompletableFuture.supplyAsync(() -> {
+			logger.infof(
+					"Invoked whisperX service with task '%s' in language '%s' for input '%s' and output '%s' in the format '%s'",
+					task, language, sourceFile, resultFile, outputFormat);
+			// Write temporary file
+			try (OutputStream os = new BufferedOutputStream(new FileOutputStream(sourceFile))) {
+				os.write(content);
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to write source file " + sourceFile, e);
+			}
+
+			// Invoke whisperX
+			try {
+				// Prepare default parameters
+				final List<String> parameters = new ArrayList<>();
+				parameters.addAll(Arrays.asList(executable, sourceFile, //
+						"--compute_type", computeType, //
+						"--output_dir", workdir, //
+						"--task", task, //
+						"--threads", this.whisperXThreads.orElse(0).toString(), //
+						"--output_format", outputFormat));
+				// Add optional parameters
+				if (language != null && !language.isBlank()) {
+					parameters.add("--language");
+					parameters.add(language);
+				}
+
+				if (this.hfToken.isPresent() && !this.hfToken.get().isBlank()) {
+					parameters.add("--hf_token");
+					parameters.add(this.hfToken.get());
+				}
+
+				if (this.diarize && this.hfToken.isPresent()) {
+					parameters.add("--diarize");
+				}
+
+				logger.debugf("Invoking %s", parameters.stream().collect(Collectors.joining(" "))
+						.replace(this.hfToken.orElse("***"), "***"));
+
+				final Process process = new ProcessBuilder(parameters.toArray(new String[parameters.size()])).start();
+
+				final int exitCode = process.waitFor();
+				logger.debugf("WhisperX final status %d", exitCode);
+
+				if (exitCode == 0) {
+					if (Files.exists(Paths.get(resultFile))) {
+						// Read result file
+						try (InputStream is = new BufferedInputStream(new FileInputStream(resultFile))) {
+							final byte[] rawContent = is.readAllBytes();
+							final String result = new String(rawContent, StandardCharsets.UTF_8);
+							return result;
+						}
+					} else {
+						throw new IOException("Result file " + resultFile + " not found");
+					}
+				} else {
+					throw new IOException("Failed to invoke " + executable + " with code " + exitCode);
+				}
+			} catch (IOException | InterruptedException e) {
+				throw new RuntimeException("Failed to invoke " + executable, e);
+			} finally {
+				// Clean up both temporary files
+				try {
+					Files.deleteIfExists(Paths.get(sourceFile));
+					Files.deleteIfExists(Paths.get(resultFile));
+				} catch (IOException e) {
+					throw new RuntimeException("Failed to clean up files", e);
+				}
+			}
+		}, executor);
+	}
 
 }
