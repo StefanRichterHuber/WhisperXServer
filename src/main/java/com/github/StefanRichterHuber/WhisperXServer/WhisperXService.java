@@ -88,7 +88,7 @@ public class WhisperXService {
 		 * Since whisperX uses a lot of compute power and memory, we limit the amount of
 		 * parallel executions.
 		 */
-		this.executor = Executors.newFixedThreadPool(numOfInstances);
+		this.executor = Executors.newFixedThreadPool(numOfInstances > 0 ? numOfInstances : 1);
 	}
 
 	/**

@@ -1,3 +1,4 @@
+# The first image uses graalvm to build a native executable for the webserver
 FROM ghcr.io/graalvm/native-image:ol8-java17-22 AS builder
 
 # Install tar and gzip to extract the Maven binaries
@@ -35,7 +36,7 @@ COPY . /build
 # Build
 RUN mvn clean install -Dnative
 
-# Build whisperX and copy the server binary
+# Build whisperX and copy the server binary created before
 FROM ubuntu:latest AS final
 
 RUN apt update && \

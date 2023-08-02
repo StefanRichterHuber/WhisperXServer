@@ -123,7 +123,7 @@ public class WhisperXServer {
     @Consumes("audio/wav")
     public Response transcribe(
             byte[] content, //
-            @QueryParam("language") @DefaultValue("en") String language, //
+            @QueryParam("language") String language, //
             @QueryParam("diarize") @DefaultValue("false") boolean diarize, //
             @HeaderParam(HttpHeaders.ACCEPT) String accept)
             throws UnsupportedAudioFileException, IOException, InterruptedException {
