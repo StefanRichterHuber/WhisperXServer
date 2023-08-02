@@ -40,14 +40,14 @@ public class WhisperXService {
 	 */
 	@Inject
 	@ConfigProperty(name = "whisperx.executable", defaultValue = "whisperx")
-	private String executable;
+	String executable;
 
 	/**
 	 * Number of parallel whisperX instances to run. Further jobs get queued.
 	 */
 	@Inject
 	@ConfigProperty(name = "whisperx.parallel-instances", defaultValue = "1")
-	private int numOfInstances;
+	int numOfInstances;
 
 	/**
 	 * WhisperX model to use. (small, medium, large-v2)
@@ -83,7 +83,7 @@ public class WhisperXService {
 	boolean diarize;
 
 	@PostConstruct
-	private void createExecutor() {
+	void createExecutor() {
 		/**
 		 * Since whisperX uses a lot of compute power and memory, we limit the amount of
 		 * parallel executions.

@@ -98,8 +98,8 @@ public class WhisperXServer {
                 return Response.serverError().entity(job.result()).build();
             }
             if (job.status() == JobStatus.ON_GOING) {
-                return Response.status(Status.ACCEPTED).entity(this.buildStatusResponse(jobID))
-                        .type(MediaType.APPLICATION_JSON).build();
+                return Response.status(Status.ACCEPTED)
+                        .entity(this.buildStatusResponse(jobID)).type(MediaType.APPLICATION_JSON).build();
             }
         }
         return Response.status(Status.NOT_FOUND).build();
@@ -154,8 +154,8 @@ public class WhisperXServer {
             }
         }, 48, TimeUnit.HOURS);
 
-        return Response.status(Status.ACCEPTED).entity(this.buildStatusResponse(jobID))
-                .type(MediaType.APPLICATION_JSON).build();
+        return Response.status(Status.ACCEPTED)
+                .entity(this.buildStatusResponse(jobID)).type(MediaType.APPLICATION_JSON).build();
     }
 
     /**
@@ -164,16 +164,8 @@ public class WhisperXServer {
      * @param id
      * @return
      */
-    private String buildStatusResponse(String id) {
-        String template = """
-                {
-                    "task": {
-                        "href": "/transcription-status?job-id=%s",
-                        "id": "%s"
-                    }
-                }
-                    """;
-        return String.format(template, id, id);
+    private TranscriptionStatus buildStatusResponse(String id) {
+        return new TranscriptionStatus(id, String.format("/transcription-status?job-id=%s", id));
     }
 
     /**
