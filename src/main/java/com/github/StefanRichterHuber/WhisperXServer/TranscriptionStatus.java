@@ -1,23 +1,36 @@
 package com.github.StefanRichterHuber.WhisperXServer;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
-import jakarta.xml.bind.annotation.XmlRootElement;
+import java.time.ZonedDateTime;
 
-@RegisterForReflection
-@XmlRootElement
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+
+@JsonInclude(Include.NON_NULL)
 public class TranscriptionStatus {
+    @JsonInclude(Include.NON_NULL)
     public static class Task {
         private final String href;
 
         private final String id;
 
+        private final String contentType;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+        private final ZonedDateTime start;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+        private final ZonedDateTime end;
+
         public Task() {
-            this(null, null);
+            this(null, null, null, null, null);
         }
 
-        public Task(String id, String href) {
+        public Task(String id, String href, String contentType, ZonedDateTime start, ZonedDateTime end) {
             this.id = id;
             this.href = href;
+            this.contentType = contentType;
+            this.start = start;
+            this.end = end;
         }
 
         public String getHref() {
@@ -26,6 +39,18 @@ public class TranscriptionStatus {
 
         public String getId() {
             return id;
+        }
+
+        public String getContentType() {
+            return this.contentType;
+        }
+
+        public ZonedDateTime getStart() {
+            return start;
+        }
+
+        public ZonedDateTime getEnd() {
+            return end;
         }
 
     }
@@ -40,8 +65,8 @@ public class TranscriptionStatus {
         this.task = task;
     }
 
-    public TranscriptionStatus(String id, String href) {
-        this.task = new Task(id, href);
+    public TranscriptionStatus(String id, String href, String contentType, ZonedDateTime start, ZonedDateTime end) {
+        this.task = new Task(id, href, contentType, start, end);
     }
 
     public Task getTask() {

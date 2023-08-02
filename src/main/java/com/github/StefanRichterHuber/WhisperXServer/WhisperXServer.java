@@ -2,6 +2,7 @@ package com.github.StefanRichterHuber.WhisperXServer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -53,7 +54,8 @@ public class WhisperXServer {
         ERROR,
     }
 
-    private record Job(String id, String accept, JobStatus status, String result) {
+    private record Job(String id, String accept, JobStatus status, String result, ZonedDateTime started,
+            ZonedDateTime ended) {
     }
 
     /**
@@ -99,7 +101,8 @@ public class WhisperXServer {
             }
             if (job.status() == JobStatus.ON_GOING) {
                 return Response.status(Status.ACCEPTED)
-                        .entity(this.buildStatusResponse(jobID)).type(MediaType.APPLICATION_JSON).build();
+                        .entity(this.buildStatusResponse(jobID, job.accept(), job.started(), job.ended()))
+                        .type(MediaType.APPLICATION_JSON).build();
             }
         }
         return Response.status(Status.NOT_FOUND).build();
@@ -132,15 +135,16 @@ public class WhisperXServer {
         // Timeouts occur -> immediately send back a 202 Accepted and let the client
         // poll the status
         final String jobID = UUID.randomUUID().toString();
-        JOBS.put(jobID, new Job(jobID, accept, JobStatus.ON_GOING, null));
+        final ZonedDateTime start = ZonedDateTime.now();
+        JOBS.put(jobID, new Job(jobID, accept, JobStatus.ON_GOING, null, start, null));
 
         final CompletableFuture<Void> process = whisperXService.transcribe(content, diarize, language, outputFormat) //
                 .thenApply(text -> {
-                    return new Job(jobID, accept, JobStatus.FINISHED, text);
+                    return new Job(jobID, accept, JobStatus.FINISHED, text, start, ZonedDateTime.now());
                 })
                 .exceptionally(e -> {
                     logger.errorf(e, "Failed to invoke WhisperX");
-                    return new Job(jobID, accept, JobStatus.ERROR, e.getMessage());
+                    return new Job(jobID, accept, JobStatus.ERROR, e.getMessage(), start, ZonedDateTime.now());
                 })
                 .thenAccept(job -> {
                     JOBS.put(jobID, job);
@@ -155,17 +159,17 @@ public class WhisperXServer {
         }, 48, TimeUnit.HOURS);
 
         return Response.status(Status.ACCEPTED)
-                .entity(this.buildStatusResponse(jobID)).type(MediaType.APPLICATION_JSON).build();
+                .entity(this.buildStatusResponse(jobID, accept, start, null)).type(MediaType.APPLICATION_JSON).build();
     }
 
     /**
-     * Builds the JSON status response for an on-going transcription processs
+     * Builds the JSON status response for an on-going transcription process
      * 
      * @param id
      * @return
      */
-    private TranscriptionStatus buildStatusResponse(String id) {
-        return new TranscriptionStatus(id, String.format("/transcription-status?job-id=%s", id));
+    private TranscriptionStatus buildStatusResponse(String id, String accept, ZonedDateTime start, ZonedDateTime end) {
+        return new TranscriptionStatus(id, String.format("/transcription-status?job-id=%s", id), accept, start, end);
     }
 
     /**

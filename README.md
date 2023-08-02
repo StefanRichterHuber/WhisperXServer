@@ -68,7 +68,9 @@ Since  the transcription can take a very long time and only one transcription is
 {
     "task": {
         "href": "/transcription-status?job-id=[UNIQUE_JOB_ID]",
-        "id": "[UNIQUE_JOB_ID]"
+        "id": "[UNIQUE_JOB_ID]",
+        "contentType": "application/json",
+        "start": "2023-08-02T21:20:06.498+0200"
     }
 }
 ```
