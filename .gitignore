@@ -41,3 +41,8 @@ nb-configuration.xml
 
 # Plugin directory
 /.quarkus/cli/plugins/
+
+# Test files
+models/
+podcast.*
+examples/

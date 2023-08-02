@@ -1,12 +1,6 @@
 package com.github.StefanRichterHuber.WhisperXServer;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -80,8 +74,9 @@ public class WhisperXService {
 	Optional<Integer> whisperXThreads;
 
 	/**
-	 * Apply diarization to assign speaker labels to each segment/word (default:
-	 * False)
+	 * Always apply diarization to assign speaker labels to each segment/word
+	 * (default:
+	 * False). Can also be requested per call.
 	 */
 	@Inject
 	@ConfigProperty(name = "whisperx.diarize", defaultValue = "false")
@@ -103,11 +98,13 @@ public class WhisperXService {
 	 * @param language     language spoken in the audio, specify null to perform
 	 *                     language detection
 	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @param diarize      Apply diarization to assign speaker labels to each
+	 *                     segment/word
 	 * @return String containing the result file
 	 */
 
-	public CompletableFuture<String> transcribe(byte[] content, String language, String outputFormat) {
-		return invokeWisperX(content, language, outputFormat, TASK_TRANSCRIBE);
+	public CompletableFuture<String> transcribe(byte[] content, boolean diarize, String language, String outputFormat) {
+		return invokeWisperX(content, diarize, language, outputFormat, TASK_TRANSCRIBE);
 	}
 
 	/**
@@ -117,11 +114,14 @@ public class WhisperXService {
 	 * @param language     language spoken in the audio, specify null to perform
 	 *                     language detection
 	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @param diarize      Apply diarization to assign speaker labels to each
+	 *                     segment/word
+	 * 
 	 * @return String containing the result file
 	 */
 
-	public CompletableFuture<String> translate(byte[] content, String language, String outputFormat) {
-		return invokeWisperX(content, language, outputFormat, TASK_TRANSLATE);
+	public CompletableFuture<String> translate(byte[] content, boolean diarize, String language, String outputFormat) {
+		return invokeWisperX(content, diarize, language, outputFormat, TASK_TRANSLATE);
 	}
 
 	/**
@@ -132,10 +132,14 @@ public class WhisperXService {
 	 *                     language detection
 	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
 	 * @param task         One of transcribe,translate
+	 * @param diarize      Apply diarization to assign speaker
+	 *                     labels to each segment/word
+	 * 
 	 * @return String containing the result file
 	 */
 
-	private CompletableFuture<String> invokeWisperX(byte[] content, String language, String outputFormat, String task) {
+	private CompletableFuture<String> invokeWisperX(byte[] content, boolean diarize, String language,
+			String outputFormat, String task) {
 
 		final String filePrefix = UUID.randomUUID().toString();
 		final String sourceFile = workdir + "/" + filePrefix + ".wav";
@@ -146,41 +150,16 @@ public class WhisperXService {
 					"Invoked whisperX service with task '%s' in language '%s' for input '%s' and output '%s' in the format '%s'",
 					task, language, sourceFile, resultFile, outputFormat);
 			// Write temporary file
-			try (OutputStream os = new BufferedOutputStream(new FileOutputStream(sourceFile))) {
-				os.write(content);
+			try {
+				Files.write(Paths.get(sourceFile), content);
 			} catch (IOException e) {
 				throw new RuntimeException("Failed to write source file " + sourceFile, e);
 			}
 
 			// Invoke whisperX
 			try {
-				// Prepare default parameters
-				final List<String> parameters = new ArrayList<>();
-				parameters.addAll(Arrays.asList(executable, sourceFile, //
-						"--compute_type", computeType, //
-						"--output_dir", workdir, //
-						"--task", task, //
-						"--threads", this.whisperXThreads.orElse(0).toString(), //
-						"--output_format", outputFormat));
-				// Add optional parameters
-				if (language != null && !language.isBlank()) {
-					parameters.add("--language");
-					parameters.add(language);
-				}
-
-				if (this.hfToken.isPresent() && !this.hfToken.get().isBlank()) {
-					parameters.add("--hf_token");
-					parameters.add(this.hfToken.get());
-				}
-
-				if (this.diarize && this.hfToken.isPresent()) {
-					parameters.add("--diarize");
-				}
-
-				logger.debugf("Invoking %s", parameters.stream().collect(Collectors.joining(" "))
-						.replace(this.hfToken.orElse("***"), "***"));
-
-				final Process process = new ProcessBuilder(parameters.toArray(new String[parameters.size()])).start();
+				final Process process = new ProcessBuilder(
+						buildProcessInvocation(language, diarize, outputFormat, task, sourceFile)).start();
 
 				final int exitCode = process.waitFor();
 				logger.debugf("WhisperX final status %d", exitCode);
@@ -188,11 +167,7 @@ public class WhisperXService {
 				if (exitCode == 0) {
 					if (Files.exists(Paths.get(resultFile))) {
 						// Read result file
-						try (InputStream is = new BufferedInputStream(new FileInputStream(resultFile))) {
-							final byte[] rawContent = is.readAllBytes();
-							final String result = new String(rawContent, StandardCharsets.UTF_8);
-							return result;
-						}
+						return Files.readString(Paths.get(resultFile), StandardCharsets.UTF_8);
 					} else {
 						throw new IOException("Result file " + resultFile + " not found");
 					}
@@ -211,6 +186,46 @@ public class WhisperXService {
 				}
 			}
 		}, executor);
+	}
+
+	/**
+	 * Builds the process invocation command to start whisperX
+	 * 
+	 * @param language     Language of the wave file
+	 * @param outputFormat Output format of the text file
+	 * @param task         Task to perform
+	 * @param sourceFile   Name of the source file
+	 * @param diarize      Perform speaker diarization
+	 * @return Command Array
+	 */
+	private String[] buildProcessInvocation(String language, boolean diarize, String outputFormat, String task,
+			final String sourceFile) {
+		// Prepare default parameters
+		final List<String> parameters = new ArrayList<>();
+		parameters.addAll(Arrays.asList(executable, sourceFile, //
+				"--compute_type", computeType, //
+				"--output_dir", workdir, //
+				"--task", task, //
+				"--threads", this.whisperXThreads.orElse(0).toString(), //
+				"--output_format", outputFormat));
+		// Add optional parameters
+		if (language != null && !language.isBlank()) {
+			parameters.add("--language");
+			parameters.add(language);
+		}
+
+		if (this.hfToken.isPresent() && !this.hfToken.get().isBlank()) {
+			parameters.add("--hf_token");
+			parameters.add(this.hfToken.get());
+		}
+
+		if ((diarize || this.diarize) && this.hfToken.isPresent()) {
+			parameters.add("--diarize");
+		}
+
+		logger.debugf("Invoking %s", parameters.stream().collect(Collectors.joining(" "))
+				.replace(this.hfToken.orElse("***"), "***"));
+		return parameters.toArray(new String[parameters.size()]);
 	}
 
 }

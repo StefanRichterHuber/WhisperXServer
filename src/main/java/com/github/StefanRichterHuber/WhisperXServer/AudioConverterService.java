@@ -1,12 +1,8 @@
 package com.github.StefanRichterHuber.WhisperXServer;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -94,19 +90,7 @@ public class AudioConverterService {
 
         // If loglevel is not quiet, lots of information is collected here. Fetch it,
         // otherwise the stream blocks
-        CompletableFuture.runAsync(() -> {
-            try (final InputStream err = new BufferedInputStream(process.getErrorStream())) {
-                final InputStreamReader r = new InputStreamReader(err, StandardCharsets.UTF_8);
-                final BufferedReader reader = new BufferedReader(r);
-
-                while (reader.ready()) {
-                    final String line = reader.readLine();
-                    logger.debugf(line);
-                }
-            } catch (IOException e) {
-
-            }
-        });
+        ProcessUtils.handleProcessOutput(process.getErrorStream(), line -> logger.debug(line));
 
         // We have to collect the result data async because otherwise the stdin
         // outputstream blocks
