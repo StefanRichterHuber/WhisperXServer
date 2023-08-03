@@ -55,5 +55,6 @@ VOLUME /root/.cache
 EXPOSE 8080
 
 # Copy the native executable into the containers
-COPY --from=builder /build/target/whisperX-server-1.0.0-SNAPSHOT-runner .
-ENTRYPOINT ["/whisperX-server-1.0.0-SNAPSHOT-runner"]
+COPY --from=builder /build/target/*-runner /whisperX/app
+WORKDIR /whisperX
+ENTRYPOINT ["/whisperX/app"]
