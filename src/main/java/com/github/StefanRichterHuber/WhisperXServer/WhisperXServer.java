@@ -120,7 +120,6 @@ public class WhisperXServer {
      * @throws IOException
      * @throws InterruptedException
      */
-
     @POST
     @Path("transcribe")
     @Consumes("audio/wav")
