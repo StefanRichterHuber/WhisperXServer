@@ -61,8 +61,8 @@ public class WhisperXServer {
     /**
      * Converts any audio file to the audio format required for WhisperX
      * 
-     * @param ar
-     * @param content
+     * @param ar      Async response
+     * @param content Raw audio file content
      */
     @POST
     @Path("/convert")

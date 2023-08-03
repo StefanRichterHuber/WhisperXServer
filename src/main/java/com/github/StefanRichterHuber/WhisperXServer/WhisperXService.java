@@ -167,6 +167,9 @@ public class WhisperXService {
 				if (exitCode == 0) {
 					if (Files.exists(Paths.get(resultFile))) {
 						// Read result file
+						logger.infof(
+								"Finished whisperX call with task '%s' in language '%s' for input '%s' and output '%s' in the format '%s'",
+								task, language, sourceFile, resultFile, outputFormat);
 						return Files.readString(Paths.get(resultFile), StandardCharsets.UTF_8);
 					} else {
 						throw new IOException("Result file " + resultFile + " not found");

@@ -6,9 +6,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 @JsonInclude(Include.NON_NULL)
+@RegisterForReflection
 public class TranscriptionStatus {
     @JsonInclude(Include.NON_NULL)
+    @RegisterForReflection
     public static class Task {
         private final String href;
 
