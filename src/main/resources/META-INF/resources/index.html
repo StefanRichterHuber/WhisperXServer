@@ -53,7 +53,7 @@
                                     <option value="application/json">JSON</option>
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary">Submit</button>
+                            <button id="submit-btn" type="submit" class="btn btn-primary">Submit</button>
                         </form>
                         <div id="statusSpinner"></div>
                         <textarea class="mb-3" style="min-width: 100%" id="transcriptionResult" rows="40" readonly
@@ -67,6 +67,8 @@
     <script>
         document.getElementById('uploadForm').addEventListener('submit', function (event) {
             event.preventDefault();
+
+            document.getElementById('submit-btn').disabled = true;
 
 
             const transcriptionElement = document.getElementById('transcriptionResult');
@@ -101,6 +103,8 @@
             xhr.onerror = function () {
                 // Handle network error
                 console.error('Network Error');
+                // Enable button again
+                document.getElementById('submit-btn').disabled = false;
             };
             xhr.send(file);
         });
@@ -146,6 +150,9 @@
 
                         // Remove the visual indicator
                         indicator.classList.remove('spinner-border');
+
+                        // Enable button again
+                        document.getElementById('submit-btn').disabled = false;
                     } else {
                         // Handle other error statuses
                         clearInterval(pollTimer);
@@ -159,6 +166,9 @@
 
                         // Remove the visual indicator
                         indicator.classList.remove('spinner-border');
+
+                        // Enable button again
+                        document.getElementById('submit-btn').disabled = false;
                     }
                 };
 
@@ -168,6 +178,9 @@
 
                     // Remove the visual indicator
                     indicator.classList.remove('spinner-border');
+
+                    // Enable button again
+                    document.getElementById('submit-btn').disabled = false;
                 };
 
                 statusXhr.send();
