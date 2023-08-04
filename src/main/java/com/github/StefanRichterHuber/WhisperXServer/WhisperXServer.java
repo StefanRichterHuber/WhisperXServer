@@ -17,6 +17,7 @@ import org.jboss.logging.Logger;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import io.quarkus.vertx.http.Compressed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -70,6 +71,7 @@ public class WhisperXServer {
     @Path("/convert")
     @Consumes("audio/*")
     @Produces("audio/wav")
+    @Compressed
     public void convertAudioToTargetFormat(@Suspended AsyncResponse ar, InputStream content) {
         CompletableFuture.runAsync(() -> {
             try {
