@@ -1,4 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WhisperX Server</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="webjars/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="webjars/bootstrap-icons/font/bootstrap-icons.min.css">
+
+    <script type="module" src="webjars/bootstrap/js/bootstrap.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3">
+                <!-- Sidebar -->
+                <div class="sidebar">
+                    <!-- Sidebar content -->
+                </div>
+            </div>
+            <div class="col-md-9">
+                <!-- Main content -->
+                <div class="main-content">
+                    <!-- Page content -->
+                    <div class="page-content">
+                        <h1>File Upload Form</h1>
+                        <form id="uploadForm" method="POST" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="audioFile" class="form-label">Select Audio File</label>
+                                <input type="file" class="form-control" id="audioFile" name="audioFile" accept="audio/*"
+                                    required>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="diarize" name="diarize">
+                                <label class="form-check-label" for="diarize">
+                                    Diarize
+                                </label>
+                            </div>
+                            <div class="mb-3">
+                                <label for="language" class="form-label">Language:</label>
+                                <select class="form-select" id="language" name="language">
+                                    <option value="en">English</option>
+                                    <option value="de">Deutsch</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                        <div id="statusSpinner"></div>
+                        <textarea id="transcriptionResult" readonly name="Text1" cols="80" rows="40"></textarea>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+
+            const transcriptionElement = document.getElementById('transcriptionResult');
+            transcriptionElement.value = 'Waiting ....';
+
+            const form = event.target;
+            const file = form.elements.audioFile.files[0];
+            const diarize = form.elements.diarize.checked;
+            const language = form.elements.language.value;
+            const queryParams = new URLSearchParams({
+                language: language,
+                diarize: diarize.toString(),
+            });
+            const url = `/transcribe?${queryParams.toString()}`;
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            xhr.setRequestHeader('Content-Type', 'audio/wav');
+            xhr.onload = function () {
+                if (xhr.status === 202) {
+                    const response = JSON.parse(xhr.responseText);
+                    const jobId = response.task.id;
+                    // Start polling the transcription status
+                    pollTranscriptionStatus(jobId);
+                } else {
+                    // Handle error response
+                    console.error('Error:', xhr.status, xhr.statusText);
+                }
+            };
+            xhr.onerror = function () {
+                // Handle network error
+                console.error('Network Error');
+            };
+            xhr.send(file);
+        });
+
+        function pollTranscriptionStatus(jobId) {
+            const pollInterval = 2000; // Interval between polling requests in milliseconds
+
+            // Add a visual indicator
+            const indicator = document.getElementById('statusSpinner');
+            indicator.classList.add('spinner-border');
+
+            const pollTimer = setInterval(() => {
+                const statusUrl = `/transcription-status?job-id=${encodeURIComponent(jobId)}`;
+                const statusXhr = new XMLHttpRequest();
+                statusXhr.open('GET', statusUrl);
+
+                statusXhr.onload = function () {
+                    const status = statusXhr.status;
+
+                    if (status === 200) {
+                        // Transcription has completed successfully
+                        clearInterval(pollTimer);
+
+                        // Process the final result
+                        const finalResult = statusXhr.responseText;
+                        console.log('Transcription completed:', finalResult);
+                        // Display the transcription result in the HTML
+
+                        const transcriptionElement = document.getElementById('transcriptionResult');
+                        transcriptionElement.value = finalResult;
+
+                        // Remove the visual indicator
+                        indicator.classList.remove('spinner-border');
+                    } else if (status === 202) {
+                        // Transcription is still in progress
+                        console.log('Transcription in progress');
+                    } else if (status === 404) {
+                        // Job ID not found
+                        clearInterval(pollTimer);
+
+                        // Handle the failure, such as displaying an error message to the user
+                        console.error('Job ID not found');
+
+                        // Remove the visual indicator
+                        indicator.classList.remove('spinner-border');
+                    } else {
+                        // Handle other error statuses
+                        clearInterval(pollTimer);
+
+                        // Handle the failure, such as displaying an error message to the user
+                        console.error('Error:', status);
+
+                        // You can also try to extract additional error information from the response if needed
+                        // const errorResponse = JSON.parse(statusXhr.responseText);
+                        // console.error('Error:', status, errorResponse);
+
+                        // Remove the visual indicator
+                        indicator.classList.remove('spinner-border');
+                    }
+                };
+
+                statusXhr.onerror = function () {
+                    // Handle network error
+                    console.error('Network Error');
+
+                    // Remove the visual indicator
+                    indicator.classList.remove('spinner-border');
+                };
+
+                statusXhr.send();
+            }, pollInterval);
+        }
+    </script>
+</body>
+
 </html>
