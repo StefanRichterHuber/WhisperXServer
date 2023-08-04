@@ -112,7 +112,7 @@ public class WhisperXOutput {
      * @param outputFormat One of srt,vtt,txt,tsv,json,aud
      * @return String representation or or null if format not supported
      */
-    public String toString(final String outputFormat) {
+    public String toFormat(final String outputFormat) {
         if ("json".equals(outputFormat)) {
             final ObjectMapper om = new ObjectMapper();
             try {
@@ -151,7 +151,7 @@ public class WhisperXOutput {
     }
 
     public String toString() {
-        return this.toString("txt");
+        return this.toFormat("txt");
     }
 
     public List<Segment> getSegments() {

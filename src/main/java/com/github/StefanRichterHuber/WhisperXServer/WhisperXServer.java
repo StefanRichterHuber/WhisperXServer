@@ -124,7 +124,7 @@ public class WhisperXServer {
     public String convertTranscription(WhisperXOutput input, @HeaderParam(HttpHeaders.ACCEPT) String accept)
             throws JsonProcessingException {
         final String outputFormat = this.getOutputFormat(accept);
-        final String result = input != null ? input.toString(outputFormat) : null;
+        final String result = input != null ? input.toFormat(outputFormat) : null;
         return result;
     }
 
