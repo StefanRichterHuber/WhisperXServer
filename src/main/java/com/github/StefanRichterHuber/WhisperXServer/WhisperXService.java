@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +17,10 @@ import java.util.stream.Collectors;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.StefanRichterHuber.WhisperXServer.WhisperXOutput.Segment;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -122,6 +127,47 @@ public class WhisperXService {
 
 	public CompletableFuture<String> translate(byte[] content, boolean diarize, String language, String outputFormat) {
 		return invokeWisperX(content, diarize, language, outputFormat, TASK_TRANSLATE);
+	}
+
+	/**
+	 * Converts a transcription model to another format
+	 * 
+	 * @param input        JSON output from WhisperXOutput
+	 * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+	 * @return
+	 * @throws JsonProcessingException
+	 */
+	public String convertTranscription(WhisperXOutput input, String outputFormat) throws JsonProcessingException {
+		if ("json".equals(outputFormat)) {
+			final ObjectMapper om = new ObjectMapper();
+			final String result = om.writeValueAsString(input);
+			return result;
+		}
+		if ("txt".equals(outputFormat)) {
+			String currentSpeaker = null;
+			final StringBuilder sb = new StringBuilder();
+
+			for (Segment segment : input.getSegments()) {
+				final String speaker = segment.getSpeaker();
+				// Header line for each speaker
+				if (speaker != null && !speaker.isBlank() && !Objects.equals(currentSpeaker, speaker)) {
+					if (!sb.isEmpty()) {
+						sb.append("\n\n");
+					}
+					sb.append(speaker).append(":").append("\n");
+					currentSpeaker = speaker;
+				}
+				final String text = segment.getText().trim();
+				sb.append(text);
+				if (text.endsWith("!") || text.endsWith("?")
+						|| text.endsWith(".")) {
+					sb.append(" ");
+				}
+			}
+			return sb.toString();
+		}
+		logger.errorf("Output format '%s' not supported for conversion", outputFormat);
+		return null;
 	}
 
 	/**

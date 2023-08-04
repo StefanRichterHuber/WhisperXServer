@@ -45,4 +45,5 @@ nb-configuration.xml
 # Test files
 models/
 podcast.*
+podcast-without-diarize.*
 examples/
