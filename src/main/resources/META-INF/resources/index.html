@@ -46,6 +46,13 @@
                                     <option value="de">Deutsch</option>
                                 </select>
                             </div>
+                            <div class="mb-3">
+                                <label for="outputFormat" class="form-label">Output format:</label>
+                                <select class="form-select" id="outputFormat" name="outputFormat">
+                                    <option value="text/plain">Plain text</option>
+                                    <option value="application/json">JSON</option>
+                                </select>
+                            </div>
                             <button type="submit" class="btn btn-primary">Submit</button>
                         </form>
                         <div id="statusSpinner"></div>
@@ -68,6 +75,8 @@
             const file = form.elements.audioFile.files[0];
             const diarize = form.elements.diarize.checked;
             const language = form.elements.language.value;
+            const outputFormat = form.elements.outputFormat.value;
+
             const queryParams = new URLSearchParams({
                 language: language,
                 diarize: diarize.toString(),
@@ -76,6 +85,7 @@
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url);
             xhr.setRequestHeader('Content-Type', 'audio/wav');
+            xhr.setRequestHeader('Accept', outputFormat || 'text/plain');
             xhr.onload = function () {
                 if (xhr.status === 202) {
                     const response = JSON.parse(xhr.responseText);
