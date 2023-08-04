@@ -209,12 +209,18 @@ public class WhisperXService {
 				"--compute_type", computeType, //
 				"--output_dir", workdir, //
 				"--task", task, //
-				"--threads", this.whisperXThreads.orElse(0).toString(), //
-				"--output_format", outputFormat));
+				"--model", this.whisperXModel, //
+				"--output_format", outputFormat //
+		));
 		// Add optional parameters
 		if (language != null && !language.isBlank()) {
 			parameters.add("--language");
 			parameters.add(language);
+		}
+
+		if (this.whisperXThreads.isPresent()) {
+			parameters.add("--threads");
+			parameters.add(this.whisperXThreads.get().toString());
 		}
 
 		if (this.hfToken.isPresent() && !this.hfToken.get().isBlank()) {
