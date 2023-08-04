@@ -2,6 +2,7 @@ package com.github.StefanRichterHuber.WhisperXServer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.StefanRichterHuber.WhisperXServer.WhisperXOutput.Segment.Word;
@@ -40,6 +41,10 @@ public class WhisperXOutput {
                 return speaker;
             }
 
+            public String toString() {
+                return String.format("%s (%,.3f - %,.3f) with score %,.2f: %s", speaker, start, end, score, word);
+            }
+
             public Word() {
                 this.word = null;
                 this.start = 0.0d;
@@ -76,6 +81,10 @@ public class WhisperXOutput {
             return this.speaker;
         }
 
+        public String toString() {
+            return String.format("%s (%,.3f - %,.3f): %s", speaker, start, end, text);
+        }
+
         public Segment() {
             this.start = 0.0d;
             this.end = 0.0d;
@@ -93,6 +102,30 @@ public class WhisperXOutput {
     public WhisperXOutput() {
         segments = new ArrayList<>();
         this.wordSegments = new ArrayList<>();
+    }
+
+    public String toString() {
+        String currentSpeaker = null;
+        final StringBuilder sb = new StringBuilder();
+
+        for (Segment segment : this.getSegments()) {
+            final String speaker = segment.getSpeaker();
+            // Header line for each speaker
+            if (speaker != null && !speaker.isBlank() && !Objects.equals(currentSpeaker, speaker)) {
+                if (!sb.isEmpty()) {
+                    sb.append("\n\n");
+                }
+                sb.append(speaker).append(":").append("\n");
+                currentSpeaker = speaker;
+            }
+            final String text = segment.getText().trim();
+            sb.append(text);
+            if (text.endsWith("!") || text.endsWith("?")
+                    || text.endsWith(".")) {
+                sb.append(" ");
+            }
+        }
+        return sb.toString();
     }
 
     public List<Segment> getSegments() {
