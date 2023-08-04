@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.StefanRichterHuber.WhisperXServer.WhisperXOutput.Segment.Word;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -104,28 +106,52 @@ public class WhisperXOutput {
         this.wordSegments = new ArrayList<>();
     }
 
-    public String toString() {
-        String currentSpeaker = null;
-        final StringBuilder sb = new StringBuilder();
-
-        for (Segment segment : this.getSegments()) {
-            final String speaker = segment.getSpeaker();
-            // Header line for each speaker
-            if (speaker != null && !speaker.isBlank() && !Objects.equals(currentSpeaker, speaker)) {
-                if (!sb.isEmpty()) {
-                    sb.append("\n\n");
-                }
-                sb.append(speaker).append(":").append("\n");
-                currentSpeaker = speaker;
-            }
-            final String text = segment.getText().trim();
-            sb.append(text);
-            if (text.endsWith("!") || text.endsWith("?")
-                    || text.endsWith(".")) {
-                sb.append(" ");
+    /**
+     * Converts this json representation of the WhisperX output to another format
+     * 
+     * @param outputFormat One of srt,vtt,txt,tsv,json,aud
+     * @return String representation or or null if format not supported
+     */
+    public String toString(final String outputFormat) {
+        if ("json".equals(outputFormat)) {
+            final ObjectMapper om = new ObjectMapper();
+            try {
+                final String result = om.writeValueAsString(this);
+                return result;
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
             }
         }
-        return sb.toString();
+        if ("txt".equals(outputFormat)) {
+            String currentSpeaker = null;
+            final StringBuilder sb = new StringBuilder();
+
+            for (Segment segment : this.getSegments()) {
+                final String speaker = segment.getSpeaker();
+                // Header line for each speaker
+                if (speaker != null && !speaker.isBlank() && !Objects.equals(currentSpeaker, speaker)) {
+                    if (!sb.isEmpty()) {
+                        sb.append("\n\n");
+                    }
+                    sb.append(speaker).append(":").append("\n");
+                    currentSpeaker = speaker;
+                }
+                final String text = segment.getText().trim();
+                sb.append(text);
+                if (text.endsWith("!") || text.endsWith("?")
+                        || text.endsWith(".")) {
+                    sb.append(" ");
+                }
+            }
+            return sb.toString();
+        }
+        // logger.errorf("Output format '%s' not supported for conversion",
+        // outputFormat);
+        return null;
+    }
+
+    public String toString() {
+        return this.toString("txt");
     }
 
     public List<Segment> getSegments() {

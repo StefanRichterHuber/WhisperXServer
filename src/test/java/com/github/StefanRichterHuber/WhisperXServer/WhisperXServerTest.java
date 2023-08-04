@@ -44,7 +44,7 @@ public class WhisperXServerTest {
             ObjectMapper om = new ObjectMapper();
             var output = om.readValue(fis, WhisperXOutput.class);
 
-            var result = whisperXService.convertTranscription(output, "txt");
+            var result = output.toString("txt");
             System.out.println(result);
         }
 
@@ -57,7 +57,7 @@ public class WhisperXServerTest {
             ObjectMapper om = new ObjectMapper();
             var output = om.readValue(fis, WhisperXOutput.class);
 
-            var result = whisperXService.convertTranscription(output, "txt");
+            var result = output.toString("txt");
             System.out.println(result);
         }
 
