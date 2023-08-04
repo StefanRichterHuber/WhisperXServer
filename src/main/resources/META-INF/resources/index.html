@@ -26,7 +26,7 @@
                 <div class="main-content">
                     <!-- Page content -->
                     <div class="page-content">
-                        <h1>File Upload Form</h1>
+                        <h1>Request audio file transcription</h1>
                         <form id="uploadForm" method="POST" enctype="multipart/form-data">
                             <div class="mb-3">
                                 <label for="audioFile" class="form-label">Select Audio File</label>
@@ -56,7 +56,8 @@
                             <button type="submit" class="btn btn-primary">Submit</button>
                         </form>
                         <div id="statusSpinner"></div>
-                        <textarea id="transcriptionResult" readonly name="Text1" cols="80" rows="40"></textarea>
+                        <textarea class="mb-3" style="min-width: 100%" id="transcriptionResult" rows="40" readonly
+                            name="Text1"></textarea>
 
                     </div>
                 </div>
