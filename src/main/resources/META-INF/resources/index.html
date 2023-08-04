@@ -138,6 +138,9 @@
 
                         // Remove the visual indicator
                         indicator.classList.remove('spinner-border');
+
+                        // Enable button again
+                        document.getElementById('submit-btn').disabled = false;
                     } else if (status === 202) {
                         // Transcription is still in progress
                         console.log('Transcription in progress');
